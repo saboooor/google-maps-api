@@ -1,5 +1,5 @@
 import express from 'express';
-
+import cors from 'cors';
 import { PlacesClient } from '@googlemaps/places';
 
 const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'PLACE_ID'];
@@ -9,7 +9,7 @@ if (!process.env.GOOGLE_MAPS_API_KEY || !process.env.PLACE_ID) {
   }
 }
 
-const { GOOGLE_MAPS_API_KEY, PLACE_ID } = process.env;
+const { GOOGLE_MAPS_API_KEY, PLACE_ID, ORIGIN } = process.env;
 
 const placesClient = new PlacesClient({
   apiKey: GOOGLE_MAPS_API_KEY!,
@@ -43,6 +43,12 @@ console.log('Place Reviews:', reviews);
 
 const app = express();
 const port = 3000;
+
+app.use(cors({
+  origin: ORIGIN?.startsWith('/^') ? new RegExp(ORIGIN.slice(2, -1)) : ORIGIN || '*',
+  methods: ["GET"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
 app.get('/', (req, res) => {
   res.send('hi pookie, how did you get here uwu');
