@@ -28,6 +28,10 @@ console.log('Place Reviews:', reviews);
 const app = express();
 const port = 3000;
 
+app.get('/', (req, res) => {
+  res.send('hi pookie, how did you get here uwu');
+});
+
 app.get('/reviews', (req, res) => {
   res.send({
     reviews: reviews,
