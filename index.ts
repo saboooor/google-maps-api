@@ -20,14 +20,16 @@ async function getPlaceDetails() {
   }, {
     otherArgs: {
       headers: {
-        'x-Goog-FieldMask': 'reviews',
+        'x-Goog-FieldMask': 'reviews,photos',
       },
-    }
+    },
   });
 
   if (!response) {
     throw new Error('No response from Places API');
   }
+
+  console.log(response);
 
   // clean up the reviews data
   const reviews = response[0].reviews?.map((review: any) => ({
@@ -35,29 +37,31 @@ async function getPlaceDetails() {
     originalText: undefined,
   }));
 
-  return reviews;
+  const { photos } = response[0];
+
+  return {
+    reviews,
+    photos,
+  };
 }
 
 const reviews = await getPlaceDetails();
-console.log('Place Reviews:', reviews);
 
 const app = express();
 const port = 3000;
 
 app.use(cors({
   origin: ORIGIN?.startsWith('/^') ? new RegExp(ORIGIN.slice(2, -1)) : ORIGIN || '*',
-  methods: ["GET"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  methods: ['GET'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.get('/', (req, res) => {
   res.send('hi pookie, how did you get here uwu');
 });
 
-app.get('/reviews', (req, res) => {
-  res.send({
-    reviews: reviews,
-  });
+app.get('/details', (req, res) => {
+  res.send(reviews);
 });
 
 app.listen(port, () => {
