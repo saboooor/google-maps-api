@@ -1,4 +1,4 @@
-# bun-ts-template
+# google-maps-api
 
 To install dependencies:
 

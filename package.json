@@ -1,5 +1,5 @@
 {
-  "name": "bun-ts-template",
+  "name": "google-maps-api",
   "module": "index.ts",
   "type": "module",
   "private": true,
