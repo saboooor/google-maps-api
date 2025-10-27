@@ -20,7 +20,7 @@ async function getPlaceDetails() {
   }, {
     otherArgs: {
       headers: {
-        'x-Goog-FieldMask': 'reviews,photos',
+        'x-Goog-FieldMask': 'reviews,userRatingCount,currentOpeningHours,regularOpeningHours',
       },
     },
   });
@@ -29,20 +29,15 @@ async function getPlaceDetails() {
     throw new Error('No response from Places API');
   }
 
-  console.log(response);
+  console.log(response[0]);
 
   // clean up the reviews data
-  const reviews = response[0].reviews?.map((review: any) => ({
+  response[0].reviews = response[0].reviews?.map((review) => ({
     ...review,
-    originalText: undefined,
+    originalText: null,
   }));
 
-  const { photos } = response[0];
-
-  return {
-    reviews,
-    photos,
-  };
+  return response[0];
 }
 
 const reviews = await getPlaceDetails();
