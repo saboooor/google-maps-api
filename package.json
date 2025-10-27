@@ -15,6 +15,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@googlemaps/places": "^2.2.0",
     "express": "^5.1.0"
   }
 }

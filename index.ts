@@ -1,5 +1,6 @@
 import express from 'express';
-import type { PlaceReview } from './types';
+
+import { PlacesClient } from '@googlemaps/places';
 
 const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'PLACE_ID'];
 if (!process.env.GOOGLE_MAPS_API_KEY || !process.env.PLACE_ID) {
@@ -10,16 +11,31 @@ if (!process.env.GOOGLE_MAPS_API_KEY || !process.env.PLACE_ID) {
 
 const { GOOGLE_MAPS_API_KEY, PLACE_ID } = process.env;
 
+const placesClient = new PlacesClient({
+  apiKey: GOOGLE_MAPS_API_KEY!,
+});
 async function getPlaceDetails() {
-  const res = await fetch(
-    `https://maps.googleapis.com/maps/api/place/details/json?place_id=${PLACE_ID}&key=${GOOGLE_MAPS_API_KEY}`,
-  );
-  const data = await res.json() as {
-    result: {
-      reviews: PlaceReview[];
-    };
-  };
-  return data.result.reviews;
+  const response = await placesClient.getPlace({
+    name: `places/${PLACE_ID}`,
+  }, {
+    otherArgs: {
+      headers: {
+        'x-Goog-FieldMask': 'reviews',
+      },
+    }
+  });
+
+  if (!response) {
+    throw new Error('No response from Places API');
+  }
+
+  // clean up the reviews data
+  const reviews = response[0].reviews?.map((review: any) => ({
+    ...review,
+    originalText: undefined,
+  }));
+
+  return reviews;
 }
 
 const reviews = await getPlaceDetails();
