@@ -30,18 +30,7 @@ const port = 3000;
 
 app.get('/reviews', (req, res) => {
   res.send({
-    reviews: [
-      {
-        id: 1,
-        text: 'Great place to visit!',
-        author: 'John Doe',
-      },
-      {
-        id: 2,
-        text: 'Had a wonderful experience!',
-        author: 'Jane Smith',
-      },
-    ],
+    reviews: reviews,
   });
 });
 
