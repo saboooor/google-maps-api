@@ -3,8 +3,8 @@ import cors from 'cors';
 import { PlacesClient } from '@googlemaps/places';
 
 // check for required environment variables
-const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'PLACE_ID', 'ORIGIN'] as const;
-const { GOOGLE_MAPS_API_KEY, PLACE_ID, ORIGIN } = Object.fromEntries(
+const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'ALLOWED_PLACE_IDS', 'ORIGIN', 'FIELD_MASK'] as const;
+const { GOOGLE_MAPS_API_KEY, ALLOWED_PLACE_IDS, ORIGIN, FIELD_MASK } = Object.fromEntries(
   requiredEnvVars.map((key) => {
     const value = process.env[key];
     if (!value) throw new Error(`${key} environment variable is not set.`);
@@ -12,12 +12,7 @@ const { GOOGLE_MAPS_API_KEY, PLACE_ID, ORIGIN } = Object.fromEntries(
   }),
 ) as Record<(typeof requiredEnvVars)[number], string>;
 
-const fieldMask = [
-  'reviews',
-  'userRatingCount',
-  'currentOpeningHours',
-  'regularOpeningHours',
-];
+const allowedPlaceIds = ALLOWED_PLACE_IDS.split(',');
 
 // initialize Google Maps Places client
 const placesClient = new PlacesClient({
@@ -25,13 +20,13 @@ const placesClient = new PlacesClient({
 });
 
 // function to fetch place details
-async function fetchPlaceDetails() {
+async function fetchPlaceDetails(placeId: string) {
   const response = await placesClient.getPlace({
-    name: `places/${PLACE_ID}`,
+    name: `places/${placeId}`,
   }, {
     otherArgs: {
       headers: {
-        'x-Goog-FieldMask': fieldMask.join(','),
+        'x-Goog-FieldMask': FIELD_MASK,
       },
     },
   });
@@ -42,13 +37,14 @@ async function fetchPlaceDetails() {
 
   return {
     ...response[0],
-    lastUpdated,
+    lastUpdated: new Date(),
   };
 }
 
 // cache place details in memory - no need for a json file for this simple use case
-let details: Awaited<ReturnType<typeof fetchPlaceDetails>>;
-let lastUpdated: Date;
+const details: {
+  [key: string]: Awaited<ReturnType<typeof fetchPlaceDetails>>;
+} = {};
 
 // set up Express server
 const app = express();
@@ -68,18 +64,25 @@ app.get('/', (req, res) => {
 
 // endpoint to get place details
 app.get('/details', async (req, res) => {
+  // validate placeId
+  const placeId = req.query.placeId as string;
+  if (!placeId || !allowedPlaceIds.includes(placeId)) {
+    return res.status(403).send({ error: 'Forbidden: Invalid or missing placeId' });
+  }
+
   // serve from cache if data is less than 1 hour old
-  if (lastUpdated > new Date(Date.now() - 60 * 60 * 1000) && details) return res.send(details);
+  if (details[placeId] && details[placeId].lastUpdated > new Date(Date.now() - 60 * 60 * 1000)) {
+    return res.send(details[placeId]);
+  }
 
   try {
     // fetch fresh details from Places API
-    details = await fetchPlaceDetails();
-    lastUpdated = new Date();
+    details[placeId] = await fetchPlaceDetails(placeId);
   } catch (error) {
     // log error and serve stale data if available
     console.error('Error fetching place details:', error);
 
-    if (!details) return res.status(500).send({
+    if (!details[placeId]) return res.status(500).send({
       error: error instanceof Error ? error.message : 'Unknown error',
     });
 
