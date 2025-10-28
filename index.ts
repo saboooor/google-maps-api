@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { PlacesClient } from '@googlemaps/places';
+import { CronJob } from 'cron';
 
 const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'PLACE_ID'];
 if (!process.env.GOOGLE_MAPS_API_KEY || !process.env.PLACE_ID) {
@@ -37,10 +38,20 @@ async function getPlaceDetails() {
     originalText: null,
   }));
 
-  return response[0];
+  return {
+    ...response[0],
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
-const reviews = await getPlaceDetails();
+let details = await getPlaceDetails();
+new CronJob(
+  '0 0 * * * *', // cronTime
+  async function () { details = await getPlaceDetails(); }, // onTick
+  null, // onComplete
+  true, // start
+  'America/Toronto', // timeZone
+);
 
 const app = express();
 const port = 3000;
@@ -56,7 +67,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/details', (req, res) => {
-  res.send(reviews);
+  res.send(details);
 });
 
 app.listen(port, () => {

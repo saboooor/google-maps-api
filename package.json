@@ -18,6 +18,7 @@
     "@googlemaps/places": "^2.2.0",
     "@types/cors": "^2.8.19",
     "cors": "^2.8.5",
+    "cron": "^4.3.3",
     "express": "^5.1.0"
   }
 }
