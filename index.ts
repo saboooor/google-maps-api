@@ -1,27 +1,37 @@
 import express from 'express';
 import cors from 'cors';
 import { PlacesClient } from '@googlemaps/places';
-import { CronJob } from 'cron';
 
-const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'PLACE_ID'];
-if (!process.env.GOOGLE_MAPS_API_KEY || !process.env.PLACE_ID) {
-  for (const varName of requiredEnvVars) {
-    if (!process.env[varName]) throw new Error(`${varName} environment variable is not set.`);
-  }
-}
+// check for required environment variables
+const requiredEnvVars = ['GOOGLE_MAPS_API_KEY', 'PLACE_ID', 'ORIGIN'] as const;
+const { GOOGLE_MAPS_API_KEY, PLACE_ID, ORIGIN } = Object.fromEntries(
+  requiredEnvVars.map((key) => {
+    const value = process.env[key];
+    if (!value) throw new Error(`${key} environment variable is not set.`);
+    return [key, value];
+  }),
+) as Record<(typeof requiredEnvVars)[number], string>;
 
-const { GOOGLE_MAPS_API_KEY, PLACE_ID, ORIGIN } = process.env;
+const fieldMask = [
+  'reviews',
+  'userRatingCount',
+  'currentOpeningHours',
+  'regularOpeningHours',
+];
 
+// initialize Google Maps Places client
 const placesClient = new PlacesClient({
-  apiKey: GOOGLE_MAPS_API_KEY!,
+  apiKey: GOOGLE_MAPS_API_KEY,
 });
-async function getPlaceDetails() {
+
+// function to fetch place details
+async function fetchPlaceDetails() {
   const response = await placesClient.getPlace({
     name: `places/${PLACE_ID}`,
   }, {
     otherArgs: {
       headers: {
-        'x-Goog-FieldMask': 'reviews,userRatingCount,currentOpeningHours,regularOpeningHours',
+        'x-Goog-FieldMask': fieldMask.join(','),
       },
     },
   });
@@ -29,8 +39,6 @@ async function getPlaceDetails() {
   if (!response) {
     throw new Error('No response from Places API');
   }
-
-  console.log(response[0]);
 
   // clean up the reviews data
   response[0].reviews = response[0].reviews?.map((review) => ({
@@ -40,18 +48,13 @@ async function getPlaceDetails() {
 
   return {
     ...response[0],
-    fetchedAt: new Date().toISOString(),
+    lastUpdated,
   };
 }
 
-let details = await getPlaceDetails();
-new CronJob(
-  '0 0 * * * *', // cronTime
-  async function () { details = await getPlaceDetails(); }, // onTick
-  null, // onComplete
-  true, // start
-  'America/Toronto', // timeZone
-);
+// cache place details in memory - no need for a json file for this simple use case
+let details: Awaited<ReturnType<typeof fetchPlaceDetails>>;
+let lastUpdated: Date;
 
 const app = express();
 const port = 3000;
@@ -63,10 +66,16 @@ app.use(cors({
 }));
 
 app.get('/', (req, res) => {
-  res.send('hi pookie, how did you get here uwu');
+  res.send('hi :)');
 });
 
-app.get('/details', (req, res) => {
+app.get('/details', async (req, res) => {
+  // check for additional fieldMask parameters in the query
+  if (!lastUpdated || lastUpdated < new Date(Date.now() - 60 * 60 * 1000)) {
+    details = await fetchPlaceDetails();
+    lastUpdated = new Date();
+  }
+
   res.send(details);
 });
 
