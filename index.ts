@@ -40,12 +40,6 @@ async function fetchPlaceDetails() {
     throw new Error('No response from Places API');
   }
 
-  // clean up the reviews data
-  response[0].reviews = response[0].reviews?.map((review) => ({
-    ...review,
-    originalText: null,
-  }));
-
   return {
     ...response[0],
     lastUpdated,
@@ -56,29 +50,51 @@ async function fetchPlaceDetails() {
 let details: Awaited<ReturnType<typeof fetchPlaceDetails>>;
 let lastUpdated: Date;
 
+// set up Express server
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
+// configure CORS for specified origin so that only our frontend can access the API
 app.use(cors({
   origin: ORIGIN?.startsWith('/^') ? new RegExp(ORIGIN.slice(2, -1)) : ORIGIN || '*',
   methods: ['GET'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// friendly greeting at root endpoint (for health checks, etc.)
 app.get('/', (req, res) => {
   res.send('hi :)');
 });
 
+// endpoint to get place details
 app.get('/details', async (req, res) => {
-  // check for additional fieldMask parameters in the query
-  if (!lastUpdated || lastUpdated < new Date(Date.now() - 60 * 60 * 1000)) {
+  // serve from cache if data is less than 1 hour old
+  if (lastUpdated > new Date(Date.now() - 60 * 60 * 1000) && details) return res.send(details);
+
+  try {
+    // fetch fresh details from Places API
     details = await fetchPlaceDetails();
     lastUpdated = new Date();
+  } catch (error) {
+    // log error and serve stale data if available
+    console.error('Error fetching place details:', error);
+
+    if (!details) return res.status(500).send({
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    console.log('Serving stale data from cache.');
+    return res.send({
+      details,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 
+  // send fresh details
   res.send(details);
 });
 
+// start the server
 app.listen(port, () => {
   console.log(`Google Maps API listening on port ${port}`);
 });
