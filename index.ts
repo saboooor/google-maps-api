@@ -72,6 +72,7 @@ app.get('/details', async (req, res) => {
 
   // serve from cache if data is less than 1 hour old
   if (details[placeId] && details[placeId].lastUpdated > new Date(Date.now() - 60 * 60 * 1000)) {
+    console.debug('Serving data from cache.');
     return res.send(details[placeId]);
   }
 
@@ -88,13 +89,14 @@ app.get('/details', async (req, res) => {
 
     console.log('Serving stale data from cache.');
     return res.send({
-      details,
+      ...details[placeId],
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 
   // send fresh details
-  res.send(details);
+  console.debug('Serving fresh data from Places API.');
+  res.send(details[placeId]);
 });
 
 // start the server
