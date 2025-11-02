@@ -70,13 +70,39 @@ app.get('/details', async (req, res) => {
     return res.status(403).send({ error: 'Forbidden: Invalid or missing placeId' });
   }
 
-  // serve from cache if data is less than 1 hour old
-  if (details[placeId] && details[placeId].lastUpdated > new Date(Date.now() - 60 * 60 * 1000)) {
-    console.debug('Serving data from cache.');
-    return res.send(details[placeId]);
-  }
-
   try {
+    if (!details[placeId]) {
+      details[placeId] = await fetchPlaceDetails(placeId);
+    }
+
+    const now = Date.now();
+    console.log(now);
+
+    const oneHourAgo = new Date(now - 60 * 60 * 1000);
+    const recent = details[placeId].lastUpdated > oneHourAgo;
+
+    const nextOpenTime = details[placeId].currentOpeningHours?.nextOpenTime?.seconds;
+    const pastNextOpenTime = nextOpenTime && Number(nextOpenTime) * 1000 < now;
+
+    const nextCloseTime = details[placeId].currentOpeningHours?.nextCloseTime?.seconds;
+    const pastNextCloseTime = nextCloseTime && Number(nextCloseTime) * 1000 - (15 * 60 * 1000) < now;
+
+    // serve from cache if data is less than 1 hour old
+    if (recent || !pastNextOpenTime || !pastNextCloseTime) {
+      switch (true) {
+      case recent:
+        console.debug('Serving cached data (recent).');
+        break;
+      case pastNextOpenTime:
+        console.debug('Serving cached data (open now).');
+        break;
+      case pastNextCloseTime:
+        console.debug('Serving cached data (closed now).');
+        break;
+      }
+      return res.send(details[placeId]);
+    }
+
     // fetch fresh details from Places API
     details[placeId] = await fetchPlaceDetails(placeId);
   } catch (error) {
