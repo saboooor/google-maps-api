@@ -88,19 +88,13 @@ app.get('/details', async (req, res) => {
     const pastNextCloseTime = nextCloseTime && Number(nextCloseTime) * 1000 - (15 * 60 * 1000) < now;
 
     // serve from cache if data is less than 1 hour old
-    if (recent || !pastNextOpenTime || !pastNextCloseTime) {
-      switch (true) {
-      case recent:
-        console.debug('Serving cached data (recent).');
-        break;
-      case pastNextOpenTime:
-        console.debug('Serving cached data (open now).');
-        break;
-      case pastNextCloseTime:
-        console.debug('Serving cached data (closed now).');
-        break;
-      }
+    if (recent && !pastNextOpenTime && !pastNextCloseTime) {
+      console.debug('Serving cached data');
       return res.send(details[placeId]);
+    }
+
+    if (pastNextCloseTime || pastNextOpenTime) {
+      console.debug('Opening hours changed, refreshing data from Places API.');
     }
 
     // fetch fresh details from Places API
